@@ -108,10 +108,10 @@ FUND_LIST = dict([
             ])
 
 
-
-funds = grabfunds(FUND_LIST)
-
-funds.to_csv('sectors.csv')
+def main():
+    funds = grabfunds(FUND_LIST)
+    funds.to_csv('sectors.csv')
+    pass
 
 if __name__ == '__main__':
     main()
