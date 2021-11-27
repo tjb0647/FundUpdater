@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # coding: utf-8
 
+# run this to download mutual fund and etf information from morning morningstar
+# this should not be used with stocks, bonds, or single fund etfs
 
 # import libraries
 from bs4 import BeautifulSoup
@@ -11,6 +13,24 @@ from datetime import datetime
 import re
 import pandas as pd
 from selenium import webdriver
+import time
+
+FUND_LIST = dict([
+            ('FCPGX', 'mutual'),
+            ('FIENX', 'mutual'),
+            ('FMIJX', 'mutual'),
+            ('FDMO' , 'etf'),
+            ('SCHV' , 'etf'),
+            ('FNCMX', 'mutual'),
+            ('FSRNX', 'mutual'),
+            ('FSSNX', 'mutual'),
+            ('GTLOX', 'mutual'),
+            ('JAENX', 'mutual'),
+            ('TLZIX', 'mutual'),
+            ('VFIAX', 'mutual'),
+            ('VINIX', 'mutual'),
+            ('VTIAX', 'mutual')
+            ])
 
 class Fund(object):
     """docstring for Fund."""
@@ -24,12 +44,7 @@ class Fund(object):
         self.asof = asof
         self.type = type
 
-#with open("/Users/tjb0647/Documents/Financials/Reports/Mutual Funds/funds.csv", "a") as csv_file:
-#    writer = csv.writer(csv_file)
-#    writer.writerow([sys.argv[1],category,maxrating,exp_ratio,datetime.now()])
-
 def grabinfo(Fund,type=None):
-    print( "Fund: " + Fund.ticker)
     if type == 'all':
         # maxfunds information
         quote_page ="http://www.maxfunds.com/funds/data.php?ticker="
@@ -58,22 +73,51 @@ def grabinfo(Fund,type=None):
         if Fund.type == 'etf':
             urlpage = "https://www.morningstar.com/etfs/arcx/" + Fund.ticker + "/portfolio"
         driver.get(urlpage)
-        driver.implicitly_wait(5)
+        driver.implicitly_wait(30)
+        btn = driver.find_element_by_id('styleWeight')
+        driver.execute_script("arguments[0].click();",btn)
+        time.sleep(4)
+        # assetclass = driver.find_element_by_class_name("sal-columns sal-small-12 sal-asset-allocation__assetTable sal-medium-8")
         sectors = driver.find_element_by_class_name("sal-sector-exposure__sector-table").text
         sectors_footer = driver.find_element_by_class_name("sal-sector-exposure__sector-footer").text
+        soup = BeautifulSoup(driver.page_source,features="lxml")
+        assetclass = pd.read_html(str(soup.find_all("table")[0]))[0]
+        assetclass.set_index('Asset Class', inplace=True)
+        if 'Net' in assetclass.columns:
+            assetclass = assetclass['Net']
+        elif 'Investment' in assetclass.columns:
+            assetclass = assetclass['Investment']
+        # sectors table...
+        # pd.read_html(str(soup.find_all("table")[4]))[0]
+        stock_style = driver.find_element_by_class_name("sr-only").text
         driver.quit()
         d = {'ticker': [Fund.ticker],
-            'Basic Materials': [re.search(r'Basic Materials (\d*\.?\d*)',sectors).groups()[0]],
-            'Consumer Cyclical':[re.search(r'Consumer Cyclical (\d*\.?\d*)',sectors).groups()[0]],
-            'Financial Services': [re.search(r'Financial Services (\d*\.?\d*)',sectors).groups()[0]],
-            'Real Estate': [re.search(r'Real Estate (\d*\.?\d*)',sectors).groups()[0]],
-            'Communication Services': [re.search(r'Communication Services (\d*\.?\d*)',sectors).groups()[0]],
-            'Energy': [re.search(r'Energy (\d*\.?\d*)',sectors).groups()[0]],
-            'Industrials': [re.search(r'Industrials (\d*\.?\d*)',sectors).groups()[0]],
-            'Technology': [re.search(r'Technology (\d*\.?\d*)',sectors).groups()[0]],
-            'Consumer Defensive': [re.search(r'Consumer Defensive (\d*\.?\d*)',sectors).groups()[0]],
-            'Healthcare': [re.search(r'Healthcare (\d*\.?\d*)',sectors).groups()[0]],
-            'Utilities': [re.search(r'Utilities (\d*\.?\d*)',sectors).groups()[0]],
+            'U.S. Equity' : float(assetclass['U.S. Equity'])/100 if Fund.type != 'bond' else None,
+            'Non-U.S. Equtiy': float(assetclass['Non-U.S. Equity'])/100 if Fund.type != 'bond' else None,
+            'Fixed Income': float(assetclass['Fixed Income'])/100 if Fund.type != 'bond' else None,
+            'Other': float(assetclass['Other'])/100 if Fund.type != 'bond' else None,
+            'Cash' : float(assetclass['Cash'])/100 if Fund.type != 'bond' else None,
+            'Not Classified': float(assetclass['Not Classified'])/100 if Fund.type != 'bond' else None,
+            'Large Value': [float(re.search(r'Large Value (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Large Blend': [float(re.search(r'Large Blend (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Large Growth': [float(re.search(r'Large Growth (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Medium Value': [float(re.search(r'Medium Value (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Medium Blend': [float(re.search(r'Medium Blend (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Medium Growth': [float(re.search(r'Medium Growth (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Small Value': [float(re.search(r'Small Value (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Small Blend': [float(re.search(r'Small Blend (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Small Growth': [float(re.search(r'Small Growth (\d*\.?\d*)',stock_style).groups()[0])/100],
+            'Basic Materials': [float(re.search(r'Basic Materials (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Consumer Cyclical':[float(re.search(r'Consumer Cyclical (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Financial Services': [float(re.search(r'Financial Services (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Real Estate': [float(re.search(r'Real Estate (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Communication Services': [float(re.search(r'Communication Services (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Energy': [float(re.search(r'Energy (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Industrials': [float(re.search(r'Industrials (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Technology': [float(re.search(r'Technology (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Consumer Defensive': [float(re.search(r'Consumer Defensive (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Healthcare': [float(re.search(r'Healthcare (\d*\.?\d*)',sectors).groups()[0])/100],
+            'Utilities': [float(re.search(r'Utilities (\d*\.?\d*)',sectors).groups()[0])/100],
             'Date': [(re.search(r'of (...+)', sectors_footer.split("|")[0]).groups()[0]).strip()]}
         Fund.sectors = pd.DataFrame(data=d)
     return Fund
@@ -81,38 +125,85 @@ def grabinfo(Fund,type=None):
 def grabfunds(fundlist):
     if len(fundlist)>0:
         df = pd.DataFrame()
+        print('Getting ',len(fundlist), ' funds...')
+        i = 1
         for fund in fundlist:
+            print (fund, " - ", i, " of ", len(fundlist))
             df1 = grabinfo(Fund(fund,type=fundlist[fund])).sectors
             df = df.append(df1)
+            i = i + 1
         df.set_index('ticker',inplace=True)
         df['Date'] = pd.to_datetime(df['Date'])
         print(df.transpose())
-        return df.transpose()
+        return df
     pass
-
-FUND_LIST = dict([
-            ('FCPGX', 'mutual'),
-            ('FIENX', 'mutual'),
-            ('FMIJX', 'mutual'),
-            ('FDMO' , 'etf'),
-            ('SCHV' , 'etf'),
-            ('FNCMX', 'mutual'),
-            ('FSRNX', 'mutual'),
-            ('FSSNX', 'mutual'),
-            ('GTLOX', 'mutual'),
-            ('JAENX', 'mutual'),
-            ('TLZIX', 'mutual'),
-            ('VFIAX', 'mutual'),
-            ('VINIX', 'mutual'),
-            ('VTIAX', 'mutual')
-            ])
 
 def main():
     funds = grabfunds(FUND_LIST)
-    funds.to_csv('sectors.csv')
+    funds.to_csv('history.csv')
+    funds.transpose().to_csv('sectors.csv')
     pass
 
+def test():
+    F = grabinfo(Fund('FIENX',type = 'mutual'))
+    F.sectors
+    F.sectors.dtypes
 
+    Fund.ticker = "FIENX"
+    Fund.type = "mutual"
+    driver = webdriver.Safari()
+    urlpage = "https://www.morningstar.com/funds/xnas/" + Fund.ticker + "/portfolio"
+    if Fund.type == 'etf':
+        urlpage = "https://www.morningstar.com/etfs/arcx/" + Fund.ticker + "/portfolio"
+    driver.get(urlpage)
+    driver.implicitly_wait(30)
+    btn = driver.find_element_by_id('styleWeight')
+    driver.execute_script("arguments[0].click();",btn)
+    time.sleep(4)
+    # assetclass = driver.find_element_by_class_name("sal-columns sal-small-12 sal-asset-allocation__assetTable sal-medium-8")
+    sectors = driver.find_element_by_class_name("sal-sector-exposure__sector-table").text
+    sectors_footer = driver.find_element_by_class_name("sal-sector-exposure__sector-footer").text
+    soup = BeautifulSoup(driver.page_source,features="lxml")
+    assetclass = pd.read_html(str(soup.find_all("table")[0]))[0]
+    assetclass.set_index('Asset Class', inplace=True)
+    if 'Net' in assetclass.columns:
+        assetclass = assetclass['Net']
+    elif 'Investment' in assetclass.columns:
+        assetclass = assetclass['Investment']
+    # sectors table...
+    # pd.read_html(str(soup.find_all("table")[4]))[0]
+    stock_style = driver.find_element_by_class_name("sr-only").text
+    driver.quit()
+    re.search(r'Large Value (\d*\.?\d*)',stock_style).groups()[0]
 
+    d = {'ticker': [Fund.ticker],
+        'U.S. Equity' : float(assetclass['U.S. Equity'])/100 if Fund.type != 'bond' else None,
+        'Non-U.S. Equtiy': float(assetclass['Non-U.S. Equity'])/100 if Fund.type != 'bond' else None,
+        'Fixed Income': float(assetclass['Fixed Income'])/100 if Fund.type != 'bond' else None,
+        'Other': float(assetclass['Other'])/100 if Fund.type != 'bond' else None,
+        'Cash' : float(assetclass['Cash'])/100 if Fund.type != 'bond' else None,
+        'Not Classified': float(assetclass['Not Classified'])/100 if Fund.type != 'bond' else None,
+        'Large Value': [float(re.search(r'Large Value (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Large Blend': [float(re.search(r'Large Blend (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Large Growth': [float(re.search(r'Large Growth (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Medium Value': [float(re.search(r'Medium Value (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Medium Blend': [float(re.search(r'Medium Blend (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Medium Growth': [float(re.search(r'Medium Growth (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Small Value': [float(re.search(r'Small Value (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Small Blend': [float(re.search(r'Small Blend (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Small Growth': [float(re.search(r'Small Growth (\d*\.?\d*)',stock_style).groups()[0])/100],
+        'Basic Materials': [float(re.search(r'Basic Materials (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Consumer Cyclical':[float(re.search(r'Consumer Cyclical (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Financial Services': [float(re.search(r'Financial Services (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Real Estate': [float(re.search(r'Real Estate (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Communication Services': [float(re.search(r'Communication Services (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Energy': [float(re.search(r'Energy (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Industrials': [float(re.search(r'Industrials (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Technology': [float(re.search(r'Technology (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Consumer Defensive': [float(re.search(r'Consumer Defensive (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Healthcare': [float(re.search(r'Healthcare (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Utilities': [float(re.search(r'Utilities (\d*\.?\d*)',sectors).groups()[0])/100],
+        'Date': [(re.search(r'of (...+)', sectors_footer.split("|")[0]).groups()[0]).strip()]}
+    Fund.sectors = pd.DataFrame(data=d)
 if __name__ == '__main__':
     main()
