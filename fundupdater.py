@@ -1,4 +1,4 @@
-#!/usr/bin/python3.7
+#!/usr/bin/python3
 # coding: utf-8
 
 
@@ -74,21 +74,21 @@ def grabinfo(Fund,type=None):
             'Consumer Defensive': [re.search(r'Consumer Defensive (\d*\.?\d*)',sectors).groups()[0]],
             'Healthcare': [re.search(r'Healthcare (\d*\.?\d*)',sectors).groups()[0]],
             'Utilities': [re.search(r'Utilities (\d*\.?\d*)',sectors).groups()[0]],
-            'Date': [sectors_footer]}
+            'Date': [(re.search(r'of (...+)', sectors_footer.split("|")[0]).groups()[0]).strip()]}
         Fund.sectors = pd.DataFrame(data=d)
     return Fund
 
 def grabfunds(fundlist):
     if len(fundlist)>0:
         df = pd.DataFrame()
-        for fund in fund_list:
-            df1 = grabinfo(Fund(fund,type=fund_list[fund])).sectors
+        for fund in fundlist:
+            df1 = grabinfo(Fund(fund,type=fundlist[fund])).sectors
             df = df.append(df1)
         df.set_index('ticker',inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'])
         print(df.transpose())
         return df.transpose()
     pass
-
 
 FUND_LIST = dict([
             ('FCPGX', 'mutual'),
@@ -107,11 +107,12 @@ FUND_LIST = dict([
             ('VTIAX', 'mutual')
             ])
 
-
 def main():
     funds = grabfunds(FUND_LIST)
     funds.to_csv('sectors.csv')
     pass
+
+
 
 if __name__ == '__main__':
     main()
