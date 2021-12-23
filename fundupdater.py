@@ -12,6 +12,7 @@ from datetime import datetime
 import re
 import pandas as pd
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 import time
 import os.path
 
@@ -77,12 +78,12 @@ def grabinfo(Fund,type=None):
         urlpage = "https://www.morningstar.com/etfs/arcx/" + Fund.ticker + "/portfolio"
     driver.get(urlpage)
     driver.implicitly_wait(30)
-    btn = driver.find_element_by_id('styleWeight')
+    btn = driver.find_element(By.ID,'styleWeight')
     driver.execute_script("arguments[0].click();",btn)
     time.sleep(4)
     # assetclass = driver.find_element_by_class_name("sal-columns sal-small-12 sal-asset-allocation__assetTable sal-medium-8")
-    sectors = driver.find_element_by_class_name("sal-sector-exposure__sector-table").text
-    sectors_footer = driver.find_element_by_class_name("sal-sector-exposure__sector-footer").text
+    sectors = driver.find_element(By.CLASS_NAME,"sal-sector-exposure__sector-table").text
+    sectors_footer = driver.find_element(By.CLASS_NAME,"sal-sector-exposure__sector-footer").text
     soup = BeautifulSoup(driver.page_source,features="lxml")
     assetclass = pd.read_html(str(soup.find_all("table")[0]))[0]
     assetclass.set_index('Asset Class', inplace=True)
@@ -92,7 +93,7 @@ def grabinfo(Fund,type=None):
         assetclass = assetclass['Investment']
     # sectors table...
     # pd.read_html(str(soup.find_all("table")[4]))[0]
-    stock_style = driver.find_element_by_class_name("sr-only").text
+    stock_style = driver.find_element(By.CLASS_NAME,"sr-only").text
     driver.quit()
     dstyles = dsectors = {}
     for style in STOCK_STYLES:
@@ -158,7 +159,7 @@ def test():
         urlpage = "https://www.morningstar.com/etfs/arcx/" + Fund.ticker + "/portfolio"
     driver.get(urlpage)
     driver.implicitly_wait(30)
-    btn = driver.find_element_by_id('styleWeight')
+    btn = driver.find_element(By.ID,'styleWeight')
     driver.execute_script("arguments[0].click();",btn)
     time.sleep(4)
     # assetclass = driver.find_element_by_class_name("sal-columns sal-small-12 sal-asset-allocation__assetTable sal-medium-8")
@@ -195,6 +196,6 @@ def test():
     d.update(dsectors)
     d['Date'] = (re.search(r'of (...+)', sectors_footer.split("|")[0]).groups()[0]).strip()
     Fund.sectors = pd.DataFrame(data=d)
-    
+
 if __name__ == '__main__':
     main()
