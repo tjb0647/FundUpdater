@@ -119,7 +119,7 @@ def grabinfo(Fund,type=None, driver=initiate_browser()):
     driver.implicitly_wait(30)
     btn = driver.find_element(By.ID,'styleWeight')
     driver.execute_script("arguments[0].click();",btn)
-    # time.sleep(4)
+    time.sleep(2)
     sectors = driver.find_element(By.CLASS_NAME,"sal-sector-exposure__sector-table").text
     sectors_footer = driver.find_element(By.CLASS_NAME,"sal-sector-exposure__sector-footer").text
     soup = BeautifulSoup(driver.page_source,features="lxml")
@@ -158,7 +158,11 @@ def append_history(funds):
     if os.path.exists(HISTORY):
         df = pd.read_csv(HISTORY).set_index('ticker')
         merged = pd.concat([funds,df])
-        funds = merged.drop_duplicates()
+        merged['Date'] = pd.to_datetime(merged['Date'])
+        merged.reset_index(inplace=True)
+        merged['ticker'] = merged['ticker'].astype('str')
+        funds = merged.drop_duplicates(subset=['ticker','Date'])
+        funds.set_index('ticker',inplace=True)
     funds.sort_values(by=['ticker', 'Date'],ascending=[True,False]).to_csv(HISTORY)
     pass
 
