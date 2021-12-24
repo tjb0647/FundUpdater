@@ -15,6 +15,9 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 import time
 import os.path
+from selenium.webdriver.chrome.options import Options
+import os
+
 
 HISTORY = 'history.csv'
 FUND_LIST = dict([
@@ -72,7 +75,14 @@ class Fund(object):
 
 def grabinfo(Fund,type=None):
     # morningstar information
-    driver = webdriver.Safari()
+    # driver = webdriver.Safari()
+    # instantiate a chrome options object so you can set the size and headless preference
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.binary_location = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+
+    driver = webdriver.Chrome(executable_path='/usr/local/bin/chromedriver', options=chrome_options)
+
     urlpage = "https://www.morningstar.com/funds/xnas/" + Fund.ticker + "/portfolio"
     if Fund.type == 'etf':
         urlpage = "https://www.morningstar.com/etfs/arcx/" + Fund.ticker + "/portfolio"
