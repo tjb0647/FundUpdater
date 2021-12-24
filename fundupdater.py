@@ -4,19 +4,27 @@
 # run this to download mutual fund and etf information from morning morningstar
 # this should not be used with stocks, bonds, or single fund etfs
 
+# selenium needs chrome installed in MacOS
+# also needs https://sites.google.com/chromium.org/driver/downloads
+# copied into /usr/local/bin/   as chromedriver
+
 # import libraries
+
+#pip3 install webdriver_manager
 from bs4 import BeautifulSoup
 import urllib.request as urllib2
 import csv
 from datetime import datetime
 import re
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 import time
 import os.path
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-import os
+#import os
 
 
 HISTORY = 'history.csv'
@@ -72,17 +80,15 @@ class Fund(object):
         self.quote_page = quote_page
         self.asof = asof
         self.type = type
-
-def grabinfo(Fund,type=None):
-    # morningstar information
-    # driver = webdriver.Safari()
+def initiate_browser():
     # instantiate a chrome options object so you can set the size and headless preference
     chrome_options = Options()
     chrome_options.add_argument("--headless")
-    chrome_options.binary_location = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    chrome_options.add_argument("--log-level=3")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    return driver
 
-    driver = webdriver.Chrome(executable_path='/usr/local/bin/chromedriver', options=chrome_options)
-
+def grabinfo(Fund,type=None, driver=initiate_browser()):
     urlpage = "https://www.morningstar.com/funds/xnas/" + Fund.ticker + "/portfolio"
     if Fund.type == 'etf':
         urlpage = "https://www.morningstar.com/etfs/arcx/" + Fund.ticker + "/portfolio"
@@ -104,7 +110,7 @@ def grabinfo(Fund,type=None):
     # sectors table...
     # pd.read_html(str(soup.find_all("table")[4]))[0]
     stock_style = driver.find_element(By.CLASS_NAME,"sr-only").text
-    driver.quit()
+    # driver.quit()
     dstyles = dsectors = {}
     for style in STOCK_STYLES:
         regex = style + " (\d*\.?\d*)"
@@ -129,13 +135,15 @@ def grabinfo(Fund,type=None):
 def grabfunds(fundlist):
     if len(fundlist)>0:
         df = pd.DataFrame()
+        driver = initiate_browser()
         print('Getting ',len(fundlist), ' funds...')
         i = 1
         for fund in fundlist:
             print (fund, " - ", i, " of ", len(fundlist))
-            df1 = grabinfo(Fund(fund,type=fundlist[fund])).sectors
+            df1 = grabinfo(Fund(fund,type=fundlist[fund]),driver=driver).sectors
             df = df.append(df1)
             i = i + 1
+        driver.quit()
         df.set_index('ticker',inplace=True)
         df['Date'] = pd.to_datetime(df['Date'])
         print(df.transpose())
