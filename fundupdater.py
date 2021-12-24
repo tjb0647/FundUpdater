@@ -10,24 +10,20 @@
 
 # import libraries
 
-#pip3 install webdriver_manager
-from bs4 import BeautifulSoup
 import urllib.request as urllib2
-import csv
+import csv, re, time, os.path
 from datetime import datetime
-import re
+
 import pandas as pd
-import time
-import os.path
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-#import os
+#pip3 install webdriver_manager
+from webdriver_manager.chrome import ChromeDriverManager
 
-
-HISTORY = 'history.csv'
+# user INPUT
 FUND_LIST = dict([
             ('FCPGX', 'mutual'),
             ('FIENX', 'mutual'),
@@ -44,6 +40,8 @@ FUND_LIST = dict([
             ('VINIX', 'mutual'),
             ('VTIAX', 'mutual')
             ])
+# configuration
+HISTORY = 'history.csv'
 STOCK_STYLES = [
     'Large Value',
     'Large Blend',
@@ -80,6 +78,31 @@ class Fund(object):
         self.quote_page = quote_page
         self.asof = asof
         self.type = type
+
+def main():
+    funds = grabfunds(FUND_LIST)
+    append_history(funds)
+    funds.transpose().to_csv('sectors.csv')
+    pass
+
+def grabfunds(fundlist):
+    if len(fundlist)>0:
+        df = pd.DataFrame()
+        driver = initiate_browser()
+        print('Getting ',len(fundlist), ' funds...')
+        i = 1
+        for fund in fundlist:
+            print (fund, " - ", i, " of ", len(fundlist))
+            df1 = grabinfo(Fund(fund,type=fundlist[fund]),driver=driver).sectors
+            df = df.append(df1)
+            i = i + 1
+        driver.quit()
+        df.set_index('ticker',inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'])
+        print(df.transpose())
+        return df
+    pass
+
 def initiate_browser():
     # instantiate a chrome options object so you can set the size and headless preference
     chrome_options = Options()
@@ -96,8 +119,7 @@ def grabinfo(Fund,type=None, driver=initiate_browser()):
     driver.implicitly_wait(30)
     btn = driver.find_element(By.ID,'styleWeight')
     driver.execute_script("arguments[0].click();",btn)
-    time.sleep(4)
-    # assetclass = driver.find_element_by_class_name("sal-columns sal-small-12 sal-asset-allocation__assetTable sal-medium-8")
+    # time.sleep(4)
     sectors = driver.find_element(By.CLASS_NAME,"sal-sector-exposure__sector-table").text
     sectors_footer = driver.find_element(By.CLASS_NAME,"sal-sector-exposure__sector-footer").text
     soup = BeautifulSoup(driver.page_source,features="lxml")
@@ -132,37 +154,14 @@ def grabinfo(Fund,type=None, driver=initiate_browser()):
     Fund.sectors = pd.DataFrame(data=d)
     return Fund
 
-def grabfunds(fundlist):
-    if len(fundlist)>0:
-        df = pd.DataFrame()
-        driver = initiate_browser()
-        print('Getting ',len(fundlist), ' funds...')
-        i = 1
-        for fund in fundlist:
-            print (fund, " - ", i, " of ", len(fundlist))
-            df1 = grabinfo(Fund(fund,type=fundlist[fund]),driver=driver).sectors
-            df = df.append(df1)
-            i = i + 1
-        driver.quit()
-        df.set_index('ticker',inplace=True)
-        df['Date'] = pd.to_datetime(df['Date'])
-        print(df.transpose())
-        return df
-    pass
-
 def append_history(funds):
     if os.path.exists(HISTORY):
         df = pd.read_csv(HISTORY).set_index('ticker')
         merged = pd.concat([funds,df])
         funds = merged.drop_duplicates()
-    funds.to_csv(HISTORY)
+    funds.sort_values(by=['ticker', 'Date'],ascending=[True,False]).to_csv(HISTORY)
     pass
 
-def main():
-    funds = grabfunds(FUND_LIST)
-    append_history(funds)
-    funds.transpose().to_csv('sectors.csv')
-    pass
 
 def test():
     F = grabinfo(Fund('FIENX',type = 'mutual'))
